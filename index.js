@@ -12,7 +12,7 @@ const LINK_REGEX =
 const P = require("pino");
 const qrcode = require("qrcode-terminal");
 const config = require("./config");
-
+console.log(config);
 
 async function startDavid() {
   const { state, saveCreds } = await useMultiFileAuthState("./session");
