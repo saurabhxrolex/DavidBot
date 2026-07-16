@@ -100,8 +100,10 @@ async function startDavid() {
     console.log("Text  :", text);
     // ===== Anti Link =====
 // ===== Anti Bad Word =====
-
 const lowerText = text.toLowerCase().trim();
+
+console.log(config.SETTINGS);
+console.log(config.SETTINGS.ANTI_BADWORD);
 
 if (config.SETTINGS.ANTI_BADWORD) {
 
