@@ -2,203 +2,200 @@ const {
   default: makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  DisconnectReason,
-  makeInMemoryStore
+  DisconnectReason
 } = require("@whiskeysockets/baileys");
+
+const P = require("pino");
+const qrcode = require("qrcode-terminal");
+const config = require("./config");
+
 const warnings = new Map();
 
 const LINK_REGEX =
 /(chat\.whatsapp\.com\/|https?:\/\/|www\.|t\.me\/|telegram\.me\/|discord\.gg\/|bit\.ly|tinyurl\.com|cutt\.ly|goo\.gl|instagram\.com|facebook\.com|youtube\.com|youtu\.be|twitter\.com|x\.com)/i;
-const P = require("pino");
-const qrcode = require("qrcode-terminal");
-const config = require("./config");
-console.log(config);
 
 async function startDavid() {
-  const { state, saveCreds } = await useMultiFileAuthState("./session");
 
-  const { version } = await fetchLatestBaileysVersion();
+const { state, saveCreds } =
+await useMultiFileAuthState("./session");
 
-  const sock = makeWASocket({
-    version,
-    auth: state,
-    printQRInTerminal: false,
-    logger: P({ level: "silent" }),
-    browser: ["David", "Chrome", "1.0.0"]
-  });
+const { version } =
+await fetchLatestBaileysVersion();
 
-  ;
+const sock = makeWASocket({
+version,
+auth: state,
+printQRInTerminal: false,
+logger: P({ level: "silent" }),
+browser: ["David", "Chrome", "1.0.0"]
+});
 
-  sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
+sock.ev.on("connection.update", ({
+connection,
+qr,
+lastDisconnect
+}) => {
 
-    if (qr) {
-      console.clear();
-      console.log("Scan QR Code");
-      qrcode.generate(qr, { small: true });
-    }
+if (qr) {
+console.clear();
+console.log("Scan QR Code");
+qrcode.generate(qr, { small: true });
+}
 
-    if (connection === "open") {
-      console.clear();
-      console.log("=================================");
-      console.log(" David Bot Connected Successfully");
-      console.log("=================================");
-    }
+if (connection === "open") {
+console.clear();
+console.log("==============================");
+console.log(" David Bot Connected");
+console.log("==============================");
+}
 
-    if (connection === "close") {
-      const shouldReconnect =
-        (lastDisconnect?.error?.output?.statusCode !==
-          DisconnectReason.loggedOut);
+if (connection === "close") {
 
-      if (shouldReconnect) {
-        startDavid();
-      } else {
-        console.log("Logged Out!");
-      }
-    }
-  });
+const shouldReconnect =
+lastDisconnect?.error?.output?.statusCode !==
+DisconnectReason.loggedOut;
 
-  sock.ev.on("creds.update", saveCreds);
+if (shouldReconnect) {
+startDavid();
+} else {
+console.log("Logged Out");
+}
 
-  // ===== Messages =====
+}
 
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+});
 
-    const msg = messages[0];
+sock.ev.on("creds.update", saveCreds);
 
-    if (!msg.message) return;
+sock.ev.on("messages.upsert", async ({ messages }) => {
 
-    if (msg.key.fromMe) return;
+const msg = messages[0];
 
-    const jid = msg.key.remoteJid;
+if (!msg.message) return;
+if (msg.key.fromMe) return;
 
-    if (!jid.endsWith("@g.us")) return;
+const jid = msg.key.remoteJid;
 
-    const metadata = await sock.groupMetadata(jid);
+if (!jid.endsWith("@g.us")) return;
 
-    const sender = msg.key.participant;
+const metadata = await sock.groupMetadata(jid);
 
-    const admins = metadata.participants
-      .filter(v => v.admin)
-      .map(v => v.id);
+const sender = msg.key.participant;
 
-    const isAdmin = admins.includes(sender);
+const admins = metadata.participants
+.filter(x => x.admin)
+.map(x => x.id);
 
-    const OWNER = "918601322748@s.whatsapp.net";
+const isAdmin = admins.includes(sender);
 
-    if (sender === OWNER) return;
+const OWNER =
+config.OWNER_NUMBER + "@s.whatsapp.net";
 
-    if (isAdmin) return;
+if (sender === OWNER) return;
+if (isAdmin) return;
 
-    const text =
-  msg.message?.conversation ||
-  msg.message?.extendedTextMessage?.text ||
-  msg.message?.imageMessage?.caption ||
-  msg.message?.videoMessage?.caption ||
-  "";
-    console.log("Group :", metadata.subject);
-    console.log("User  :", sender);
-    console.log("Text  :", text);
-    // ===== Anti Link =====
+const text =
+msg.message?.conversation ||
+msg.message?.extendedTextMessage?.text ||
+msg.message?.imageMessage?.caption ||
+msg.message?.videoMessage?.caption ||
+"";
+
+console.log("Group :", metadata.subject);
+console.log("User  :", sender);
+console.log("Text  :", text);
 // ===== Anti Bad Word =====
+
 const lowerText = text.toLowerCase().trim();
 
-console.log(config.SETTINGS);
-console.log(config.SETTINGS.ANTI_BADWORD);
+if (config.SETTINGS.ANTI_BADWORD && text) {
 
-if (config.SETTINGS.ANTI_BADWORD) {
+  const found = config.BAD_WORDS.some(word =>
+    lowerText.includes(word.toLowerCase())
+  );
 
-    console.log("Text:", lowerText);
-    console.log("Bad Words:", config.BAD_WORDS);
+  if (found) {
 
-    const found = config.BAD_WORDS.some(word =>
-        lowerText.includes(word.toLowerCase().trim())
-    );
-
-    console.log("Found bad word:", found);
-console.log(
-  "Matched word:",
-  config.BAD_WORDS.find(word =>
-    lowerText.includes(word.toLowerCase().trim())
-  )
-);
-    if (found) {
-
-        try {
-            await sock.sendMessage(jid, {
-                delete: msg.key
-            });
-        } catch (e) {
-            console.log("Delete Error:", e);
-        }
-
-        let count = warnings.get(sender) || 0;
-        count++;
-        warnings.set(sender, count);
-
-        await sock.sendMessage(jid, {
-            text: `⚠️ @${sender.split("@")[0]}\nWarning ${count}/3\nBad words allowed nahi hain.`,
-            mentions: [sender]
-        });
-
-        return;
+    try {
+      await sock.sendMessage(jid, {
+        delete: msg.key
+      });
+    } catch (err) {
+      console.log("Delete Error:", err);
     }
-}
-if (LINK_REGEX.test(text)) {
 
     await sock.sendMessage(jid, {
-        delete: msg.key
+      text: `⚠️ *David*\n\n@${sender.split("@")[0]}\nAbusive message delete kar diya gaya.`,
+      mentions: [sender]
     });
 
-    let count = warnings.get(sender) || 0;
-    count++;
-    warnings.set(sender, count);
+    return;
+  }
+}
 
-    if (count === 1) {
+// ===== Anti Link =====
 
-        await sock.sendMessage(jid, {
-            text: `⚠️ @${sender.split("@")[0]}\n\nWarning 1/3\nLinks allowed nahi hain.`,
-            mentions: [sender]
-        });
+if (config.SETTINGS.ANTI_LINK && LINK_REGEX.test(text)) {
 
-    } else if (count === 2) {
+  try {
+    await sock.sendMessage(jid, {
+      delete: msg.key
+    });
+  } catch (err) {
+    console.log("Delete Error:", err);
+  }
 
-        await sock.sendMessage(jid, {
-            text: `⚠️ @${sender.split("@")[0]}\n\nWarning 2/3\nAgli baar remove kar diye jaoge.`,
-            mentions: [sender]
-        });
+  let count = warnings.get(sender) || 0;
+  count++;
+  warnings.set(sender, count);
 
-    } else {
+  if (count === 1) {
 
+    await sock.sendMessage(jid, {
+      text: `⚠️ *David*\n\n@${sender.split("@")[0]}\nWarning 1/3\nLinks allowed nahi hain.`,
+      mentions: [sender]
+    });
+
+    return;
+
+  } else if (count === 2) {
+
+    await sock.sendMessage(jid, {
+      text: `⚠️ *David*\n\n@${sender.split("@")[0]}\nWarning 2/3\nAgli baar remove kar diye jaoge.`,
+      mentions: [sender]
+    });
+
+    return;
+
+  } else {
+
+    warnings.delete(sender);
         try {
 
-            await sock.groupParticipantsUpdate(
-                jid,
-                [sender],
-                "remove"
-            );
+      await sock.groupParticipantsUpdate(
+        jid,
+        [sender],
+        "remove"
+      );
 
-            await sock.sendMessage(jid, {
-                text: `🚫 @${sender.split("@")[0]} ko 3 baar link bhejne par remove kar diya gaya.`,
-                mentions: [sender]
-            });
+      await sock.sendMessage(jid, {
+        text: `🚫 *David*\n\n@${sender.split("@")[0]} ko 3 baar link bhejne par group se remove kar diya gaya.`,
+        mentions: [sender]
+      });
 
-            warnings.delete(sender);
+    } catch (err) {
 
-        } catch (err) {
+      console.log("Kick Error:", err);
 
-            console.log(err);
-
-            await sock.sendMessage(jid, {
-                text: "❌ User remove nahi ho paya. David ko admin banao."
-            });
-
-        }
+      await sock.sendMessage(jid, {
+        text: "❌ User remove nahi ho paya. David ko group admin banao."
+      });
 
     }
 
     return;
-}
-  });
+  }
+});
 
 }
 
