@@ -109,7 +109,7 @@ if (config.SETTINGS.ANTI_BADWORD) {
   const found = config.BAD_WORDS.some(word =>
     lowerText.includes(word.toLowerCase())
   );
-
+console.log("Found bad word:", found);
   if (found) {
     await sock.sendMessage(jid, {
       delete: msg.key
