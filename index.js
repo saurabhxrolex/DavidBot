@@ -89,43 +89,52 @@ async function startDavid() {
 
     if (isAdmin) return;
 
-    let text = "";
-
-    if (msg.message.conversation)
-      text = msg.message.conversation;
-
-    if (msg.message.extendedTextMessage)
-      text = msg.message.extendedTextMessage.text;
-
+    const text =
+  msg.message?.conversation ||
+  msg.message?.extendedTextMessage?.text ||
+  msg.message?.imageMessage?.caption ||
+  msg.message?.videoMessage?.caption ||
+  "";
     console.log("Group :", metadata.subject);
     console.log("User  :", sender);
     console.log("Text  :", text);
     // ===== Anti Link =====
 // ===== Anti Bad Word =====
 
-const lowerText = text.toLowerCase();
+const lowerText = text.toLowerCase().trim();
 
 if (config.SETTINGS.ANTI_BADWORD) {
-  const found = config.BAD_WORDS.some(word =>
-    lowerText.includes(word.toLowerCase())
-  );
-console.log("Found bad word:", found);
-  if (found) {
-    await sock.sendMessage(jid, {
-      delete: msg.key
-    });
 
-    let count = warnings.get(sender) || 0;
-    count++;
-    warnings.set(sender, count);
+    console.log("Text:", lowerText);
+    console.log("Bad Words:", config.BAD_WORDS);
 
-    await sock.sendMessage(jid, {
-      text: `⚠️ @${sender.split("@")[0]}\nWarning ${count}/3\nBad words allowed nahi hain.`,
-      mentions: [sender]
-    });
+    const found = config.BAD_WORDS.some(word =>
+        lowerText.includes(word.toLowerCase().trim())
+    );
 
-    return;
-  }
+    console.log("Found bad word:", found);
+
+    if (found) {
+
+        try {
+            await sock.sendMessage(jid, {
+                delete: msg.key
+            });
+        } catch (e) {
+            console.log("Delete Error:", e);
+        }
+
+        let count = warnings.get(sender) || 0;
+        count++;
+        warnings.set(sender, count);
+
+        await sock.sendMessage(jid, {
+            text: `⚠️ @${sender.split("@")[0]}\nWarning ${count}/3\nBad words allowed nahi hain.`,
+            mentions: [sender]
+        });
+
+        return;
+    }
 }
 if (LINK_REGEX.test(text)) {
 
