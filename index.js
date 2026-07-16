@@ -11,7 +11,7 @@ const LINK_REGEX =
 /(chat\.whatsapp\.com\/|https?:\/\/|www\.|t\.me\/|telegram\.me\/|discord\.gg\/|bit\.ly|tinyurl\.com|cutt\.ly|goo\.gl|instagram\.com|facebook\.com|youtube\.com|youtu\.be|twitter\.com|x\.com)/i;
 const P = require("pino");
 const qrcode = require("qrcode-terminal");
-
+const config = require("./config");
 
 
 async function startDavid() {
@@ -101,7 +101,32 @@ async function startDavid() {
     console.log("User  :", sender);
     console.log("Text  :", text);
     // ===== Anti Link =====
+// ===== Anti Bad Word =====
 
+const lowerText = text.toLowerCase();
+
+if (config.SETTINGS.ANTI_BADWORD) {
+  const found = config.BAD_WORDS.some(word =>
+    lowerText.includes(word.toLowerCase())
+  );
+
+  if (found) {
+    await sock.sendMessage(jid, {
+      delete: msg.key
+    });
+
+    let count = warnings.get(sender) || 0;
+    count++;
+    warnings.set(sender, count);
+
+    await sock.sendMessage(jid, {
+      text: `⚠️ @${sender.split("@")[0]}\nWarning ${count}/3\nBad words allowed nahi hain.`,
+      mentions: [sender]
+    });
+
+    return;
+  }
+}
 if (LINK_REGEX.test(text)) {
 
     await sock.sendMessage(jid, {
