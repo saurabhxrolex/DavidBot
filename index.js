@@ -113,7 +113,12 @@ if (config.SETTINGS.ANTI_BADWORD) {
     );
 
     console.log("Found bad word:", found);
-
+console.log(
+  "Matched word:",
+  config.BAD_WORDS.find(word =>
+    lowerText.includes(word.toLowerCase().trim())
+  )
+);
     if (found) {
 
         try {
