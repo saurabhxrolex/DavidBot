@@ -1,0 +1,25 @@
+{
+  "name": "DavidBot",
+  "version": "1.0.0",
+  "description": "David WhatsApp Moderation Bot",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "david",
+    "whatsapp",
+    "baileys",
+    "bot",
+    "moderation"
+  ],
+  "author": "David",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.13",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0",
+    "bad-words": "^4.0.0"
+  }
+}
