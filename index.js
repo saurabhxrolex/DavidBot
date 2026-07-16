@@ -27,7 +27,7 @@ async function startDavid() {
     browser: ["David", "Chrome", "1.0.0"]
   });
 
-  store.bind(sock.ev);
+  ;
 
   sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
 
